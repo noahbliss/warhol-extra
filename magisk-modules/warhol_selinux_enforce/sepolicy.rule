@@ -1,0 +1,92 @@
+allow adbroot same_process_hal_file file read
+allow batterysecret kmsg_device chr_file getattr
+allow ccci_mdinit init_service_status_private_prop file { getattr map open read }
+allow ccci_mdinit sysfs_memory dir search
+allow ccci_mdinit sysfs_memory file { getattr open read }
+allow ccci_rpcd default_prop file { getattr map open read }
+allow fsck rescue_block_device blk_file { ioctl open read write }
+allow hal_batteryantiaging_default sysfs_ti_battery dir search
+allow hal_batteryantiaging_default sysfs_ti_battery file { getattr open read }
+allow hal_batteryantiaging_default sysfs_wireless_supply dir search
+allow hal_batteryantiaging_default sysfs_wireless_supply file { getattr open read }
+allow hal_graphics_composer_default system_prop file { getattr map open read }
+allow hal_keymint_strongbox hal_system_suspend_service service_manager find
+allow hal_keymint_strongbox system_suspend binder call
+allow hal_misys_vendor_default sysfs_soc dir search
+allow hal_misys_vendor_default sysfs_soc file { getattr open read }
+allow hal_nfc_default vendor_persist_nfc_prop file { getattr map open read }
+allow hal_touchfeature_xiaomi_default default_prop file { getattr map open read }
+allow hal_touchfeature_xiaomi_default vendor_default_prop property_service set
+allow hal_vibrator_default mnt_vendor_file dir search
+allow hal_vibrator_default persist_data_file dir search
+allow hal_weaver_default hal_system_suspend_service service_manager find
+allow hal_weaver_default system_suspend binder call
+allow init hwservice_contexts_file file getattr
+allow init keystore2_key_contexts_file file getattr
+allow init mac_perms_file file getattr
+allow init proc file write
+allow init seapp_contexts_file file getattr
+allow init service_contexts_file file getattr
+allow init sysfs_perf file { open write }
+allow init system_lib_file dir mounton
+allow init tee_service_contexts_file file getattr
+allow init_insmod_sh init_insmod_sh capability sys_nice
+allow init_insmod_sh init_insmod_sh key write
+allow init_insmod_sh kernel process setsched
+allow init_insmod_sh proc_cmdline file { getattr open read }
+allow kcmdlinemodprobe kcmdlinemodprobe capability dac_override
+allow mi_thermald vendor_default_prop property_service set
+allow mnld default_prop file { getattr map open read }
+allow mtk_hal_audio default_prop file { getattr map open read }
+allow mtk_hal_camera cgroup file read
+allow mtk_hal_camera default_prop file read
+allow mtk_hal_camera shell_data_file dir search
+allow mtk_hal_camera sys_thermal_torch_real_level file { getattr open read write }
+allow mtk_hal_camera sysfs file { getattr open read }
+allow mtk_hal_camera sysfs_perf dir search
+allow mtk_hal_camera system_data_file dir search
+allow mtk_hal_camera vendor_default_prop property_service set
+allow mtk_hal_mmlpq boot_status_prop file { getattr map open read }
+allow mtk_hal_power thermal_data_file dir { read search watch }
+allow mtk_hal_usb sysfs_usb_supply file { getattr open read }
+allow netutils_wrapper ccci_device chr_file { read write }
+allow netutils_wrapper ccci_vts_device chr_file { read write }
+allow netutils_wrapper ccci_wifi_proxy_device chr_file { read write }
+allow netutils_wrapper gsm0710muxd_device chr_file { read write }
+allow netutils_wrapper nvdata_file file read
+allow nvram_daemon sysfs_dt_firmware_android file { getattr open read }
+allow platform_app_36 proc_pressure_cpu file { getattr open read }
+allow platform_app_36 proc_pressure_io file { getattr open read }
+allow platform_app_36 proc_pressure_mem file { getattr open read }
+allow platform_app_36 vendor_default_prop file { getattr map open }
+allow priv_app device dir open
+allow radio default_android_service service_manager { add find }
+allow radio vendor_default_prop file { getattr map open }
+allow rild default_prop file { getattr map open read }
+allow secure_element system_data_file file open
+allow servicemanager hal_touchfeature_xiaomi_default binder call
+allow surfaceflinger vendor_default_prop file { getattr map open }
+allow system_app default_android_service service_manager find
+allow system_app mtk_hal_audio binder call
+allow system_app mtk_hal_bluetooth binder call
+allow system_app system_suspend_control_internal_service service_manager find
+allow system_app system_suspend_control_service service_manager find
+allow system_app tracingproxy_service service_manager find
+allow system_app vendor_default_prop file { getattr map open }
+allow system_suspend hal_keymint_strongbox binder transfer
+allow system_suspend hal_weaver_default binder transfer
+allow uart_launcher sysfs_dt_firmware_android dir search
+allow uart_launcher sysfs_dt_firmware_android file { getattr open read }
+allow vendor_hal_citsensorservice_xiaomi_default dmabuf_system_heap_device chr_file { open read }
+allow vendor_hal_citsensorservice_xiaomi_default dmabuf_system_secure_heap_device chr_file { open read }
+allow vendor_hal_citsensorservice_xiaomi_default system_prop file { getattr map open }
+allow vendor_hal_citsensorservice_xiaomi_default vendor_default_prop property_service set
+allow vendor_hal_displayfeature_xiaomi_default system_prop file { getattr map open read }
+allow vendor_init default_prop file { getattr map open read }
+allow vendor_init default_prop property_service set
+allow vendor_init proc file write
+allow vendor_init vendor_mtk_atm_mdmode_prop property_service set
+allow vendor_init vendor_mtk_eara_io_prop property_service set
+allow vendor_init vendor_mtkcam_prop property_service set
+allow vendor_touch_init_shell vendor_fp_prop property_service set
+allow vold sysfs_memory file write

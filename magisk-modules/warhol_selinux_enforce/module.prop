@@ -1,0 +1,6 @@
+id=warhol_selinux_enforce
+name=Warhol SELinux Enforcing
+version=v3
+versionCode=3
+author=warhol
+description=Applies allow-rules for the eng-vendor boot denials and flips SELinux to Enforcing EARLY (post-fs-data, before zygote/system_server) instead of ~20s after boot. Bootloop self-heal: auto-reverts to permissive after 2 failed enforcing boots. Kill-switch: touch /data/adb/no_enforce. Rules cover the captured boot denial surface only.

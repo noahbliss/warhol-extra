@@ -1,0 +1,6 @@
+id=warhol_display_cal
+name=Warhol Display Calibration
+version=v1
+versionCode=1
+author=warhol
+description=First-pass auto-brightness calibration: a smooth lux->brightness curve to cut overshoot/undershoot, replacing the generic fallback. Overlays /vendor/etc/displayconfig/display_id. Reversible: disable to restore stock.

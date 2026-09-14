@@ -1,0 +1,35 @@
+<displayConfiguration>
+    <screenBrightnessMap>
+        <point>
+            <value>0.0</value>
+            <nits>2.0</nits>
+        </point>
+        <point>
+            <value>1.0</value>
+            <nits>490.0</nits>
+        </point>
+    </screenBrightnessMap>
+    <autoBrightness enabled="true">
+        <brighteningLightDebounceMillis>4000</brighteningLightDebounceMillis>
+        <darkeningLightDebounceMillis>6000</darkeningLightDebounceMillis>
+        <luxToBrightnessMapping>
+            <mode>default</mode>
+            <map>
+                <point><first>0</first><second>0.02</second></point>
+                <point><first>3</first><second>0.035</second></point>
+                <point><first>10</first><second>0.06</second></point>
+                <point><first>30</first><second>0.10</second></point>
+                <point><first>50</first><second>0.14</second></point>
+                <point><first>100</first><second>0.20</second></point>
+                <point><first>200</first><second>0.28</second></point>
+                <point><first>400</first><second>0.38</second></point>
+                <point><first>700</first><second>0.47</second></point>
+                <point><first>1200</first><second>0.57</second></point>
+                <point><first>2000</first><second>0.67</second></point>
+                <point><first>3500</first><second>0.80</second></point>
+                <point><first>6000</first><second>0.92</second></point>
+                <point><first>10000</first><second>1.0</second></point>
+            </map>
+        </luxToBrightnessMapping>
+    </autoBrightness>
+</displayConfiguration>
