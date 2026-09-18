@@ -1,0 +1,164 @@
+diff --git a/packages/SystemUI/res/values/config.xml b/packages/SystemUI/res/values/config.xml
+index 140bb805a..216848b6c 100644
+--- a/packages/SystemUI/res/values/config.xml
++++ b/packages/SystemUI/res/values/config.xml
+@@ -714,6 +714,11 @@
+          when the device supports an under-display fingerprint sensor -->
+     <integer name="config_udfpsDeviceEntryIconLongPress" translatable="false">100</integer>
+ 
++    <!-- Whether to send Xiaomi's FOD condition updates (IXiaomiFingerprint#extCmd) when
++         the UDFPS overlay shows and hides. Xiaomi's optical FOD daemon does not arm
++         touch FOD detection or light the sensor until it gets them. -->
++    <bool name="config_xiaomiFodConditionUpdates">false</bool>
++
+     <!-- package name of a built-in camera app to use to restrict implicit intent resolution
+          when the double-press power gesture is used. Ignored if empty. -->
+     <string translatable="false" name="config_cameraGesturePackage"></string>
+diff --git a/packages/SystemUI/src/com/android/systemui/biometrics/UdfpsController.java b/packages/SystemUI/src/com/android/systemui/biometrics/UdfpsController.java
+index f189327a0..bcbcb988d 100644
+--- a/packages/SystemUI/src/com/android/systemui/biometrics/UdfpsController.java
++++ b/packages/SystemUI/src/com/android/systemui/biometrics/UdfpsController.java
+@@ -204,6 +204,8 @@ public class UdfpsController implements DozeReceiver, Dumpable {
+     // TODO(b/229290039): UDFPS controller should manage its dimensions on its own. Remove this.
+     @Nullable private Runnable mAuthControllerUpdateUdfpsLocation;
+     @Nullable private UdfpsDisplayModeProvider mUdfpsDisplayMode;
++    // Tells a Xiaomi optical FOD stack when the overlay is up; a no-op elsewhere.
++    @NonNull private final XiaomiFodConditionNotifier mXiaomiFodConditions;
+ 
+     // The ID of the pointer for which ACTION_DOWN has occurred. -1 means no pointer is active.
+     private int mActivePointerId = MotionEvent.INVALID_POINTER_ID;
+@@ -767,6 +769,7 @@ public class UdfpsController implements DozeReceiver, Dumpable {
+                 false /* resetLockoutRequiresHardwareAuthToken */);
+ 
+         mBiometricExecutor = biometricsExecutor;
++        mXiaomiFodConditions = new XiaomiFodConditionNotifier(context, biometricsExecutor);
+         mPrimaryBouncerInteractor = primaryBouncerInteractor;
+         mShadeInteractor = shadeInteractor;
+         mAlternateBouncerInteractor = alternateBouncerInteractor;
+@@ -872,6 +875,7 @@ public class UdfpsController implements DozeReceiver, Dumpable {
+             mOnFingerDown = false;
+             mAttemptedToDismissKeyguard = false;
+             mOrientationListener.enable();
++            mXiaomiFodConditions.onOverlayShown();
+             if (mFingerprintManager != null) {
+                 mFingerprintManager.onUdfpsUiEvent(FingerprintManager.UDFPS_UI_OVERLAY_SHOWN,
+                         overlay.getRequestId(), mSensorProps.sensorId);
+@@ -891,6 +895,7 @@ public class UdfpsController implements DozeReceiver, Dumpable {
+                 onFingerUp(mOverlay.getRequestId(), oldView);
+             }
+             final boolean removed = mOverlay.hide();
++            mXiaomiFodConditions.onOverlayHidden();
+             mKeyguardViewManager.hideAlternateBouncer(
+                     /* updateScrim */ true,
+                     /* clearDismissAction */ false
+diff --git a/packages/SystemUI/src/com/android/systemui/biometrics/XiaomiFodConditionNotifier.java b/packages/SystemUI/src/com/android/systemui/biometrics/XiaomiFodConditionNotifier.java
+new file mode 100644
+index 000000000..75d6f81ba
+--- /dev/null
++++ b/packages/SystemUI/src/com/android/systemui/biometrics/XiaomiFodConditionNotifier.java
+@@ -0,0 +1,105 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package com.android.systemui.biometrics;
++
++import android.content.Context;
++import android.os.IBinder;
++import android.os.Parcel;
++import android.os.RemoteException;
++import android.os.ServiceManager;
++import android.util.Log;
++
++import com.android.systemui.res.R;
++
++import java.util.concurrent.Executor;
++
++/**
++ * Tells a Xiaomi optical under-display fingerprint stack when the UDFPS overlay is up.
++ *
++ * <p>Xiaomi's FOD daemon only arms the touch panel's FOD detection and the local-HBM
++ * illumination spot once it has been told, through {@code IXiaomiFingerprint#extCmd},
++ * that the FOD UI is showing (condition 1) and that a fingerprint operation is running
++ * (condition 4). MIUI's framework sends these; AOSP has no equivalent, so without this
++ * the sensor is never lit and never sees a finger. The overlay's show and hide bracket
++ * every UDFPS operation: enrollment, keyguard and BiometricPrompt.
++ *
++ * <p>Off unless a device overlay sets {@code config_xiaomiFodConditionUpdates}.
++ */
++final class XiaomiFodConditionNotifier {
++    private static final String TAG = "XiaomiFodConditions";
++
++    private static final String DESCRIPTOR =
++            "vendor.xiaomi.hardware.fingerprintextension.IXiaomiFingerprint";
++    private static final String SERVICE = DESCRIPTOR + "/default";
++    // int extCmd(int cmd, int param) is the interface's first method.
++    private static final int TRANSACTION_EXT_CMD = IBinder.FIRST_CALL_TRANSACTION;
++
++    // Condition 1: the FOD UI is showing. Touch FOD detection is never enabled without it.
++    private static final int CMD_FOD_UI = 1;
++    // Condition 4: fingerprint operation state. RUNNING arms touch FOD and lets the daemon
++    // light the local-HBM spot on finger down; STOPPED also turns the spot off.
++    private static final int CMD_FINGERPRINT_STATE = 4;
++    private static final int FINGERPRINT_STATE_RUNNING = 1;
++    private static final int FINGERPRINT_STATE_STOPPED = 2;
++
++    private final boolean mEnabled;
++    private final Executor mExecutor;
++    // Main thread only, like the overlay show/hide that drive it.
++    private boolean mRunning;
++
++    XiaomiFodConditionNotifier(Context context, Executor executor) {
++        mEnabled = context.getResources().getBoolean(R.bool.config_xiaomiFodConditionUpdates);
++        mExecutor = executor;
++    }
++
++    /** The UDFPS overlay was added: an operation that needs the sensor has started. */
++    void onOverlayShown() {
++        if (!mEnabled || mRunning) {
++            return;
++        }
++        mRunning = true;
++        mExecutor.execute(() -> {
++            extCmd(CMD_FINGERPRINT_STATE, FINGERPRINT_STATE_RUNNING);
++            extCmd(CMD_FOD_UI, 1);
++        });
++    }
++
++    /** The UDFPS overlay was removed: the operation is over. */
++    void onOverlayHidden() {
++        if (!mEnabled || !mRunning) {
++            return;
++        }
++        mRunning = false;
++        mExecutor.execute(() -> {
++            extCmd(CMD_FOD_UI, 0);
++            extCmd(CMD_FINGERPRINT_STATE, FINGERPRINT_STATE_STOPPED);
++        });
++    }
++
++    private static void extCmd(int cmd, int param) {
++        // Looked up on every call rather than cached: when the daemon restarts, its binder
++        // is replaced.
++        final IBinder binder = ServiceManager.checkService(SERVICE);
++        if (binder == null) {
++            Log.w(TAG, SERVICE + " is not running");
++            return;
++        }
++        final Parcel data = Parcel.obtain();
++        final Parcel reply = Parcel.obtain();
++        try {
++            data.writeInterfaceToken(DESCRIPTOR);
++            data.writeInt(cmd);
++            data.writeInt(param);
++            binder.transact(TRANSACTION_EXT_CMD, data, reply, 0);
++            reply.readException();
++        } catch (RemoteException | RuntimeException e) {
++            Log.w(TAG, "extCmd(" + cmd + ", " + param + ") failed", e);
++        } finally {
++            data.recycle();
++            reply.recycle();
++        }
++    }
++}

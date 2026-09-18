@@ -1,0 +1,109 @@
+#!/sbin/sh
+#
+# warhol-modules-pack installer (TWRP/OrangeFox shell update-binary)
+#
+# Stages bundled Magisk modules into /data/adb/modules/<id>/ so they are
+# active on the FIRST boot after a /data format. magiskd (spawned by
+# magiskinit from the patched init_boot partition, which survives a /data
+# wipe) mounts every /data/adb/modules/<id>/ at post-fs-data, before
+# zygote, with no Magisk app needed.
+#
+# Flash right after formatting /data, before the first boot.
+# Idempotent: safe to re-flash. Touches nothing outside /data/adb/modules.
+
+ZIP="$3"
+OUTFD="$2"
+
+ui_print() {
+    # Standard TWRP idiom: write "ui_print <msg>" plus a bare "ui_print"
+    # (blank line) to the pipe fd the recovery passed us.
+    if [ -n "${OUTFD:-}" ] && [ -e "/proc/self/fd/${OUTFD}" ]; then
+        printf 'ui_print %s\nui_print\n' "$1" > "/proc/self/fd/${OUTFD}" 2>/dev/null
+    else
+        printf '%s\n' "$1"
+    fi
+}
+
+abort() {
+    ui_print "ERROR: $1"
+    ui_print " "
+    exit 1
+}
+
+# --------------------------------------------------------------- sanity
+[ -n "${ZIP:-}" ] || abort "update-binary was not given the zip path (arg 3)"
+[ -f "$ZIP" ] || abort "zip not found: $ZIP"
+
+# ---------------------------------------------------------------- /data
+# TWRP normally already has /data mounted. If not, try once, then bail.
+if ! grep -q " /data " /proc/mounts; then
+    ui_print "/data is not mounted; trying 'mount /data' ..."
+    mount /data >/dev/null 2>&1
+fi
+if ! mkdir -p /data/adb/modules 2>/dev/null; then
+    abort "/data is not mounted or not writable; mount /data in recovery and re-flash"
+fi
+
+# -------------------------------------------------------------- extract
+WORK=/dev/tmp/warhol_modules_pack
+rm -rf "$WORK"
+mkdir -p "$WORK" || abort "cannot create scratch dir $WORK"
+
+UNZIP=""
+if command -v unzip >/dev/null 2>&1; then
+    UNZIP="unzip"
+elif command -v busybox >/dev/null 2>&1; then
+    UNZIP="busybox unzip"
+else
+    abort "no unzip available in recovery"
+fi
+
+ui_print "Extracting module payload from pack ..."
+if ! $UNZIP -o "$ZIP" 'modules/*' -d "$WORK" >/dev/null 2>&1; then
+    rm -rf "$WORK"
+    abort "failed to extract modules/* from $ZIP"
+fi
+
+# ---------------------------------------------------------------- stage
+MODULES=/data/adb/modules
+STAGED=""
+COUNT=0
+
+for src in "$WORK"/modules/*; do
+    [ -d "$src" ] || continue
+    id=$(basename "$src")
+    case "$id" in
+        ""|"."|".."|*/*) continue ;;
+    esac
+    if [ ! -f "$src/module.prop" ]; then
+        ui_print "WARNING: skipping '$id' (no module.prop)"
+        continue
+    fi
+
+    dst="$MODULES/$id"
+    rm -rf "$dst"
+    cp -a "$src" "$dst" || { rm -rf "$WORK"; abort "failed to copy '$id' into place"; }
+    chown -R 0:0 "$dst"
+    find "$dst" -type d -exec chmod 0755 {} \;
+    find "$dst" -type f -exec chmod 0644 {} \;
+    rm -f "$dst/disable" "$dst/remove" "$dst/update"
+    if command -v restorecon >/dev/null 2>&1; then
+        restorecon -R "$dst" >/dev/null 2>&1
+    fi
+
+    name=$(sed -n 's/^name=//p' "$dst/module.prop" | head -n 1)
+    ver=$(sed -n 's/^version=//p' "$dst/module.prop" | head -n 1)
+    ui_print "  staged: $id ($name, $ver)"
+    STAGED="$STAGED $id"
+    COUNT=$((COUNT + 1))
+done
+
+rm -rf "$WORK"
+
+[ "$COUNT" -gt 0 ] || abort "no modules were staged (payload has no modules/*?)"
+
+ui_print " "
+ui_print "warhol-modules-pack: staged $COUNT module(s):$STAGED"
+ui_print "They activate on the next boot (first boot after a /data format)."
+ui_print "Done."
+exit 0

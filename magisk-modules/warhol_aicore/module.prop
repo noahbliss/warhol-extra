@@ -1,0 +1,6 @@
+id=warhol_aicore
+name=warhol AiCore (Google on-device intelligence)
+version=v1
+versionCode=1
+author=warhol
+description=Google AiCore priv-app (Google-signed stub from stock product) + stock privapp allowlist. Enables Play to deliver the current AiCore, providing the on-device-intelligence backend Circle-to-Search waits on. Sign into Google after install.

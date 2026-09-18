@@ -1,0 +1,82 @@
+# Classes the MediaTek IMS blobs reference that this build does not provide.
+#
+# Regenerate with:  KNOWN=/dev/null tools/check-ims-closure.sh
+# The point of this file is the DIFF: a name appearing that is not listed here is
+# a regression from a rebuild, and worth chasing. The list itself is expected to
+# be non-empty -- stock ships code for a MIUI framework that warhol under
+# LineageOS does not have.
+#
+# 40 unresolved: 16 reachable from an IMS jar, 24 only from mediatek-services.jar.
+# Those 24 are inert for a stronger reason than "not IMS": NOTHING in this build
+# loads mediatek-services.jar. It is on neither classpath .pb, no installed jar or
+# APK contains its name, and no config file references it. Stock does not put it on
+# SYSTEMSERVERCLASSPATH either. Do not chase them.
+#
+# All 17 of the IMS-reachable ones are XIAOMI classes, most of them hiding inside
+# AOSP package names. docs/TELEPHONY.md has the measured 22-member stub surface
+# and the reasons it has not been written yet. The ones with evidence of sitting
+# on a live path:
+#
+#   MiuiImsControllerStub     MtkGsmCdmaPhone.setImsRegistrationState, ungated
+#   MiuiWifiManager           WifiSarController.<init>, ungated
+#   HyperOSCustFeatureResolve WifiSarController.<init>, ungated
+#
+# TelephonyBaseUtilsStub was REMOVED from this list on 2026-09-10: it was listed as
+# a dead reference, and it is not. It is called on a live path and took
+# com.android.phone down every boot:
+#   NoClassDefFoundError: #     at DataStateController.registerSettingsObserver(DataStateController.java:243)
+#     at MtkTelephonyAssistService.updatePhoneCreatedState(...:313)
+# The member it needs is also not what this file claimed. The ONLY reference in any
+# blob we ship -- mediatek-ims-common.jar, mediatek-telephony-common.jar and
+# MtkTelephonyAssist.apk -- is
+#     invoke-static {}, Landroid/telephony/TelephonyBaseUtilsStub;.isMiuiRom:()Z
+# not isVonrEnabledByUser/factoryReset. It is now provided, returning false, by
+# compat/src/android/telephony/TelephonyBaseUtilsStub.java.
+#
+# The lesson generalises: presence in this list is NOT evidence a reference is
+# inert. Verify with a call-site dump before assuming. tools/scan-fwk-access.py
+# does that systematically.
+#
+# TelephonyMetrics is NOT here: it was the one genuinely fatal reference and is
+# fixed by inheriting hardware/lineage/compat/frameworks/compat.mk.
+
+Landroid/net/wifi/AmlMiuiWifiManager;
+Landroid/net/wifi/MiuiWifiManager;
+Lcom/android/internal/telephony/data/MiuiDataControllerStub;
+Lcom/android/internal/telephony/data/MiuiDataControllerStub$IMiuiDataController;
+Lcom/android/internal/telephony/data/MiuiPhoneSwitcherStub;
+Lcom/android/internal/telephony/data/MiuiPhoneSwitcherStub$IMiuiPhoneSwitcher;
+Lcom/android/internal/telephony/imsphone/MiuiImsControllerStub;
+Lcom/android/internal/telephony/imsphone/MiuiImsControllerStub$IMiuiImsController;
+Lcom/android/internal/telephony/MiuiNetworkControllerStub;
+Lcom/android/internal/telephony/MiuiNetworkControllerStub$IMiuiNetworkController;
+Lcom/android/internal/telephony/TelephonyCommonUtilsStub;
+Lcom/android/internal/telephony/TelephonyCommonUtilsStub$ITelephonyCommonUtils;
+Lcom/android/internal/telephony/uicc/MiuiUiccControllerStub;
+Lcom/android/internal/telephony/uicc/MiuiUiccControllerStub$IMiuiUiccController;
+Lcom/android/server/pm/dex/DexoptOptions;
+Lcom/android/server/wm/ActivityTaskManagerDebugConfig;
+Lcom/mediatek/aee/ExceptionLog;
+Lcom/mediatek/boostfwk/BoostFwkFactory;
+Lcom/mediatek/boostfwk/BoostFwkManager;
+Lcom/mediatek/boostfwk/scenario/BasicScenario;
+Lcom/mediatek/boostfwk/scenario/launch/LaunchScenario;
+Lcom/mediatek/bt/BluetoothAppAcceptList;
+Lcom/mediatek/bt/BluetoothLeCallControl;
+Lcom/mediatek/dx/DexOptExt;
+Lcom/mediatek/dx/DexOptExtFactory;
+Lcom/mediatek/server/am/AmsExt;
+Lcom/mediatek/server/audio/AudioServiceExt;
+Lcom/mediatek/server/MtkSystemServer;
+Lcom/mediatek/server/MtkSystemServiceFactory;
+Lcom/mediatek/server/pm/PmsExt;
+Lcom/mediatek/server/powerhal/PowerHalManager;
+Lcom/mediatek/server/ppl/MtkPplManager;
+Lcom/mediatek/server/wm/WmsExt;
+Ldalvik/annotation/SourceDebugExtension;
+Ljava/lang/instrument/ClassFileTransformer;
+Ljava/lang/instrument/Instrumentation;
+Lmiui/os/Build;
+Lmiui/os/HyperOSCustFeatureResolve;
+Lsun/misc/Signal;
+Lsun/misc/SignalHandler;

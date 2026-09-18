@@ -1,0 +1,23 @@
+diff --git a/quickstep/src/com/android/quickstep/util/ScalingWorkspaceRevealAnim.kt b/quickstep/src/com/android/quickstep/util/ScalingWorkspaceRevealAnim.kt
+index 7aec25f906..9c36d1f8ba 100644
+--- a/quickstep/src/com/android/quickstep/util/ScalingWorkspaceRevealAnim.kt
++++ b/quickstep/src/com/android/quickstep/util/ScalingWorkspaceRevealAnim.kt
+@@ -186,13 +186,11 @@ class ScalingWorkspaceRevealAnim(
+ 
+             // Add a blur animation to the scrim layer.
+             var maxBlurRadius =
+-                launcher.resources.getDimensionPixelSize(
+-                    if (Flags.allAppsBlur() || Flags.enableOverviewBackgroundWallpaperBlur()) {
+-                        R.dimen.max_depth_blur_radius_enhanced
+-                    } else {
+-                        R.integer.max_depth_blur_radius
+-                    }
+-                )
++                if (Flags.allAppsBlur() || Flags.enableOverviewBackgroundWallpaperBlur()) {
++                    launcher.resources.getDimensionPixelSize(R.dimen.max_depth_blur_radius_enhanced)
++                } else {
++                    launcher.resources.getInteger(R.integer.max_depth_blur_radius)
++                }
+             val blurAnimator = ValueAnimator.ofFloat(1f, 0f)
+             blurAnimator.setInterpolator(BLUR_INTERPOLATOR)
+             blurAnimator.addUpdateListener {

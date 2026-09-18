@@ -1,0 +1,6 @@
+id=warhol_asi
+name=Android System Intelligence (ASI)
+version=v1
+versionCode=1
+author=warhol
+description=Google-signed Android System Intelligence (com.google.android.as) as a privileged /product app + privapp-permissions allowlist. On-device intelligence backend (Circle to Search, Live Caption, smart features).

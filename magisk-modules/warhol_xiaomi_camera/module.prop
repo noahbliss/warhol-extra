@@ -1,0 +1,6 @@
+id=warhol_xiaomi_camera
+name=Xiaomi Camera (MiuiCamera)
+version=v1.0
+versionCode=1
+author=warhol
+description=Stock Xiaomi MiuiCamera 6.3.008790.1 as a second camera app (com.android.camera) alongside Aperture. Installed to /system/priv-app as a PRIVILEGED app with a privapp-permissions allowlist (grants SYSTEM_CAMERA for full-res MIVI computational capture) plus a per-package hidden-API allowlist so the MIUI camera runs on AOSP. Full-res 4096x3072 Ultra HDR verified 2026-09-17.

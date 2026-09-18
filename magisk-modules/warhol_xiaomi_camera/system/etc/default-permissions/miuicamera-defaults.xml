@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Boot-time runtime-permission grants for stock MiuiCamera (com.android.camera).
+
+  Read by DefaultPermissionGrantPolicy from /system/etc/default-permissions/
+  (our Android 17 tree, DefaultPermissionGrantPolicy.readDefaultPermissionExceptions).
+  Without these the app comes up with no camera/mic/location permission and
+  dies on the first open instead of showing its UI - it is a preinstalled-style
+  app and does not degrade gracefully to a permission dialog.
+
+  fixed="false": everything granted here stays revocable in Settings.
+-->
+<exceptions>
+    <exception package="com.android.camera">
+        <permission name="android.permission.CAMERA" fixed="false" />
+        <permission name="android.permission.RECORD_AUDIO" fixed="false" />
+        <permission name="android.permission.ACCESS_FINE_LOCATION" fixed="false" />
+        <permission name="android.permission.ACCESS_COARSE_LOCATION" fixed="false" />
+        <permission name="android.permission.READ_MEDIA_IMAGES" fixed="false" />
+        <permission name="android.permission.READ_MEDIA_VIDEO" fixed="false" />
+        <permission name="android.permission.READ_MEDIA_AUDIO" fixed="false" />
+    </exception>
+</exceptions>

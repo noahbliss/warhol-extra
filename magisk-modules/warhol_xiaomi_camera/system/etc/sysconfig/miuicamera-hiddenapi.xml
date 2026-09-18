@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Per-package hidden-API exemption for stock MiuiCamera (com.android.camera).
+
+  Read by com.android.server.SystemConfig from /system/etc/sysconfig
+  (ALLOW_ALL, SystemConfig.java readPermissions in our Android 17 tree) and
+  consumed by AndroidPackageUtils#getHiddenApiEnforcementPolicy: a package on
+  the system image listed here gets HIDDEN_API_ENFORCEMENT_DISABLED.
+
+  Why this exists: MiuiCamera's "ResGuard" hook reflectively calls
+  android.app.ResourcesManager#getOrCreateActivityResourcesStructLocked(IBinder)
+  and friends. Those members exist in Android 17 but carry the flag
+  "lo-prio,max-target-o" (greylist-max-O) in out/soong/hiddenapi/hiddenapi-flags.csv,
+  so for an app with targetSdk >= 28 Class#getDeclaredMethod() reports them as
+  absent -> the app crashes at first Activity creation with
+  "NoSuchMethodException ... not found in null". With this exemption the
+  reflection resolves, as it does on HyperOS.
+
+  Scope: applies ONLY to the package named below, and only while it is
+  installed on a system partition (this module puts it in /system/app).
+-->
+<config>
+    <hidden-api-whitelisted-app package="com.android.camera" />
+</config>
