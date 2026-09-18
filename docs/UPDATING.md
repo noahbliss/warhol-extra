@@ -14,20 +14,19 @@ quarter's worth of upstream changes will take longer.
 | --- | --- | --- | --- |
 | system, system_ext, product | LineageOS source, built here | SPL 2026-09-01 | **yes** |
 | vendor, odm, vendor_dlkm | stock Xiaomi Global OS3.0.310.0, plus our injected SELinux policy | vendor SPL 2026-02-01 | no |
-| kernel | stock GKI `6.12.38-android16-5` in `boot` | built 2026-03-18 | no |
+| kernel, system_dlkm | Google's certified GKI in `boot`, Google's modules in `system_dlkm` | `android16-6.12-2025-09_r38`, released 2026-09-03 | no: [Updating the kernel](#updating-the-kernel) |
 | firmware (modem, TEE, LK, preloader, SCP) | stock / engineering firmware | | no |
 | Magisk | patched `init_boot` | 30.7 | no |
 | Google apps | MindTheGapps module, then Play | | Play updates them |
 
 This procedure keeps the Android framework and everything else LineageOS builds current.
-It does **not** move the kernel or the vendor blobs, and those age. Updating them means
-writing `boot`, `vendor` or other partitions this procedure never touches. That is a
-separate project needing its own decision. The two candidate routes are:
+It does **not** move the kernel or the vendor blobs, and those age:
 
-* a newer Google GKI boot image for the same `android16-6.12` KMI, so the stock vendor
-  modules still load;
-* the vendor, odm and vendor_dlkm partitions from a newer Xiaomi Global release, with our
-  policy re-injected.
+* **The kernel** has its own procedure, [Updating the kernel](#updating-the-kernel). It
+  writes `boot` and `system_dlkm`, so each run needs its own decision.
+* **The vendor blobs** would have to come from the vendor, odm and vendor_dlkm partitions
+  of a newer Xiaomi Global release, with our policy re-injected. There is no procedure for
+  that yet.
 
 ## Cadence
 
@@ -40,6 +39,9 @@ separate project needing its own decision. The two candidate routes are:
   (24.0, 24.1, ...). Once it moves, fixes stop landing on the old branch, so some
   quarterly updates are a **branch bump** (see below), not a routine update.
   `update-check` tells you which one you face.
+* In the same monthly check, run `gki_update.py list` to see whether Google released a
+  newer kernel on the phone's line. The kernel is updated separately; see
+  [Updating the kernel](#updating-the-kernel).
 
 ## One-time prerequisites
 
@@ -272,6 +274,159 @@ flashing.** TWRP cannot back up `/data` on this phone.
 A new Android major version (LineageOS 25) is a port, not an update. Build it in a
 second tree, as 24.0 was, and keep the working tree as the fallback.
 
+## Updating the kernel
+
+The kernel is Google's certified GKI boot image, unmodified. Xiaomi ships it the same way.
+Google keeps releasing fixed builds of each release line. Every build on the phone's line,
+`android16-6.12-2025-09_rN`, keeps KMI generation 5, so Xiaomi's 579 vendor modules still
+load on it unchanged. That means an update writes only two partitions:
+
+* `boot_a` gets Google's new image. The phone's own vbmeta blob is copied in verbatim, so
+  the boot patch level the TEE sees does not change. The copied blob no longer matches the
+  image, just as with a Magisk-patched image; `vbmeta` is `flags=2`, so nothing checks it.
+* `system_dlkm_a` gets Google's modules from the same build. Each GKI build signs its
+  modules with a key generated for that build, so the old modules would not load on the
+  new kernel. Xiaomi's selection of modules is kept.
+
+Later release lines (2025-12 onwards) are KMI generation 6. Xiaomi's modules do not load on
+them: 2026-06_r27 fails 13,649 symbol CRCs across 545 modules. Moving to one needs a Xiaomi
+firmware built for generation 6.
+
+The phone ran the stock `2025-09_r32` until 2026-09-18 and has run `r38` since. The r38
+update fixed binder and eventpoll use-after-frees, Bluetooth and HID out-of-bounds reads,
+and TLB-invalidation errata of the Arm C1 cores this SoC uses.
+
+**1. Is one due?** Check monthly, alongside `update-check`. This is read-only:
+
+```bash
+python3 warhol-extra/tools/gki_update.py list
+```
+
+It shows the phone's release line and marks newer builds on it as candidates. Google
+publishes about one build a month. Its release notes are linked from the
+[release page](https://source.android.com/docs/core/architecture/kernel/gki-android16-6_12-release-builds).
+
+**2. Build and check.** The phone must be booted into Android and attached. `build` reads
+the live `boot_a`, `system_dlkm_a`, `vendor_boot_a` and `/vendor_dlkm`, and writes nothing
+to the phone:
+
+```bash
+python3 warhol-extra/tools/gki_update.py build 2025-09_r<N>
+```
+
+It downloads Google's certified image and that build's modules and symbol lists into
+`gki/`. It stops at the first failed check:
+
+* The new kernel has the phone's KMI generation, and it is newer than the running one.
+* The system_dlkm recipe (depmod, `mkfs.erofs`, `avbtool`) rebuilds the live partition
+  byte for byte, apart from avbtool's version string. So the new image differs from the
+  live one only in its modules.
+* Every symbol import of every vendor module (about 34,000) has the same CRC in the new
+  kernel as in the running one. The same check is first run against the running kernel as
+  a control, and it must find 0 mismatches there.
+* No symbol that a vendor module imports has disappeared, for example because Google
+  dropped a module. r38 dropped `tls.ko`; nothing on warhol used it.
+* No module list in `vendor_boot` names a module signed with the running kernel's key.
+  Under the new kernel such a module counts as unsigned and is refused. First-stage init
+  treats any listed module that fails to load as fatal, and TWRP uses `boot_a`'s kernel,
+  so TWRP would not start. See [the one-time vendor_boot change](#the-one-time-vendor_boot-change).
+
+It also prints the kernel config changes, for information. `--check-only` runs every check,
+reports all failures and builds nothing; use it to see why a release is refused.
+
+The result goes to `gki/builds/<tag>/`:
+
+* `boot_a.img` and `system_dlkm_a.img`
+* `rollback/`, which holds copies of both live partitions
+* `SHA256SUMS`
+* `README.txt`, which has the exact commands for the steps below
+
+`gki/work/<tag>/` is scratch space and can be deleted afterwards.
+
+Run on the release the phone already runs, `build` reproduces the flashed images exactly.
+That is how the tool was tested.
+
+**3. Flash `boot_a` from fastboot.** Like every write to `boot`, this and the next step need
+explicit approval, given for this update. Hold the button combination for fastboot, then:
+
+```bash
+fastboot flash boot_a gki/builds/<tag>/boot_a.img
+```
+
+This bootloader does not support `fastboot boot`, so there is no RAM-only trial. Do not
+switch modes from fastboot either (`fastboot reboot recovery` and the like). Use the
+buttons.
+
+**4. Write `system_dlkm_a` from TWRP.** Enter TWRP with the button combination. TWRP runs on
+`boot_a`'s kernel, so TWRP coming up is the first test of the new kernel. Then:
+
+```bash
+python3 warhol-extra/tools/gki_update.py write-dlkm gki/builds/<tag>
+```
+
+It refuses unless all of these hold:
+
+* the phone is in TWRP on slot `_a`;
+* TWRP runs the new kernel;
+* `boot_a` is exactly this build's `boot_a.img`;
+* `system_dlkm` is not mounted.
+
+It pushes the image, checks its sha256 on the phone, writes
+`/dev/block/mapper/system_dlkm_a`, verifies the result with an on-device sha256, and
+test-mounts it.
+
+**5. Boot and verify.** `adb reboot`, enter the PIN, then:
+
+```bash
+bash warhol-extra/tools/postflash_check.sh                          # 16 pass
+adb shell uname -r                                                  # the new build's ab number
+adb shell su -c 'dmesg | grep -c "disagrees about version"'         # 0
+```
+
+Then test by hand the list from step 10 of the routine update. The vendor modules are what
+breaks if anything is wrong, so do not skip fingerprint, face unlock, camera, Wi-Fi,
+Bluetooth, a call, and auto-brightness (sensors).
+
+**If the new kernel does not come up** (Android or TWRP hangs at the logo or loops), do not
+power-cycle more than twice: slot `_b` has no bootloader. Instead:
+
+1. Hold the button combination for fastboot, which does not depend on the kernel. Then run
+   `fastboot flash boot_a gki/builds/<tag>/rollback/boot_a.img`.
+2. If `system_dlkm_a` was already written, enter TWRP, which is back on the old kernel, and
+   run `gki_update.py write-dlkm gki/builds/<tag> --rollback`.
+
+### The one-time vendor_boot change
+
+Stock `vendor_boot` listed Xiaomi's copies of `rfkill.ko` and `libarc4.ko` in
+`modules.load.recovery`. These are GKI modules signed by the stock kernel's key, loaded in
+TWRP's first stage. On 2026-09-18, those two were removed from that list on the phone, along
+with `cfg80211.ko` and `mac80211.ko`, which need them. Normal boot never listed them: it
+loads them from `system_dlkm` in second stage. With that change, `vendor_boot` no longer
+depends on the kernel build, and the `build` check above keeps it that way.
+
+If `vendor_boot` is ever replaced (a stock image, a new TWRP), `build` stops on this check.
+The same edit, from the build host with the phone booted:
+
+```bash
+H=$B/src/out/host/linux-x86/bin; mkdir vb && cd vb
+adb exec-out "su -c 'cat /dev/block/by-name/vendor_boot_a'" > live.img
+$H/unpack_bootimg --boot_img live.img --out u --format mkbootimg > args
+$H/lz4 -dc u/vendor_ramdisk00 > rd00.cpio
+python3 $B/warhol-extra/tools/cpio_drop.py rd00.cpio rd00.new \
+    lib/modules/modules.load.recovery libarc4.ko rfkill.ko cfg80211.ko mac80211.ko
+$H/lz4 -l -12 --favor-decSpeed rd00.new rd00.new.lz4
+eval python3 $B/src/system/tools/mkbootimg/mkbootimg.py \
+    "$(sed 's#u/vendor_ramdisk00#rd00.new.lz4#' args)" --vendor_boot new.img
+```
+
+Check the dropped modules against the recovery list first. Nothing that stays in the list
+may depend on them (`modules.dep` in the same ramdisk). `new.img` is shorter than the
+partition; writing it is a `vendor_boot` write, which needs its own approval. Write it from
+Android with `dd`, and verify it with an on-device sha256 over the image's length. The
+`lz4` flags and the unpack arguments reproduce the stock image byte for byte. So first
+repack the unmodified `u/vendor_ramdisk00` the same way, and compare the result with the
+start of the live image: `cmp -n $(stat -c %s check.img) check.img live.img`.
+
 ## Rolling back
 
 * **Images, same branch:** flash the previous `builds/` directory the same way. Its path is
@@ -287,6 +442,8 @@ second tree, as 24.0 was, and keep the working tree as the fallback.
   example before experimenting in the tree.
 * **Across a branch bump:** expect to need a data wipe. Follow the reinstall runbook
   instead.
+* **Kernel:** see the end of step 5 in [Updating the kernel](#updating-the-kernel).
+  `gki/builds/<tag>/rollback/` holds both partitions as they were before that update.
 
 ## Troubleshooting
 
@@ -295,7 +452,7 @@ second tree, as 24.0 was, and keep the working tree as the fallback.
 | `patch_report.sh` shows `MISSING` | upstream changed the code a fix targets. The log line printed near it usually says which anchor failed. Fix the script in `patches/tree/`. |
 | `policy-check`: control PASS, new FAIL | the new platform policy no longer provides something our vendor CIL uses; the `secilc` error names the line in `vendor_sepolicy.cil`. The fix belongs in `device/xiaomi/warhol/sepolicy/warhol_enforce.rules`, and the vendor image must then be rebuilt (`./remote-build.sh enforce-vendor`) and flashed. That flash is a separate step and needs its own explicit approval. |
 | `policy-check`: both FAIL | the vendor-side copy or the tool is wrong, not the build. Re-pull with the phone attached. |
-| boot loop after flashing | boot TWRP by hand and flash the rollback `builds/` directory. TWRP lives in `vendor_boot`, which this procedure never touches. If every boot lands in TWRP although the ROM is fine, the misc partition holds a stale `boot-recovery`: in TWRP, `dd if=/dev/zero of=/dev/block/by-name/misc bs=1 count=32 conv=notrunc`, then `adb reboot`. |
+| boot loop after flashing | boot TWRP by hand and flash the rollback `builds/` directory. TWRP lives in `vendor_boot`, which this procedure never touches, but it runs on `boot_a`'s kernel. If TWRP hangs too, the kernel is at fault: see [Updating the kernel](#updating-the-kernel). If every boot lands in TWRP although the ROM is fine, the misc partition holds a stale `boot-recovery`: in TWRP, `dd if=/dev/zero of=/dev/block/by-name/misc bs=1 count=32 conv=notrunc`, then `adb reboot`. |
 | mobile data off after the flash, airplane mode off | `persist.radio.airplane_mode_on` latched at 1. Run `adb shell setprop persist.radio.airplane_mode_on 0`, then toggle airplane mode on and off. |
 | home screen scrambled or launcher crashing | the trebuchet module does not match the ROM's Launcher3. Install the module built for this ROM (step 8). |
 | `resync` stops at a stash or `repo sync` error | nothing has been synced yet if the stash failed; fix that project by hand and rerun. `repo sync` retries four times; network failures just need a rerun. |
@@ -304,9 +461,14 @@ second tree, as 24.0 was, and keep the working tree as the fallback.
 
 Each rule below cost a brick, a lost feature, or a near miss:
 
-* **Only `system`, `system_ext` and `product` are written.** Never write `boot`,
-  `vendor_boot`, `vbmeta`, `init_boot`, `lk`, the preloader, `nvdata`, `nvcfg` or
-  `protect1/2`. `vbmeta` must stay `flags=2` for this unit's bootloader.
+* **A ROM update writes only `system`, `system_ext` and `product`.** A kernel update writes
+  only `boot_a` and `system_dlkm_a`, and each of those writes needs explicit approval.
+  `vendor_boot` holds TWRP and is written only with its own approval. Never write
+  `vbmeta`, `init_boot`, `lk`, the preloader, `nvdata`, `nvcfg` or `protect1/2`. `vbmeta`
+  must stay `flags=2` for this unit's bootloader.
+* **Every write is verified with an on-device sha256,** and only slot `_a` is written.
+* **A phone that does not boot gets at most two power cycles,** then the button combination
+  for fastboot. Slot `_b` has no bootloader, and nothing below fastboot can reach this unit.
 * **Never sideload the OTA zip, and never accept an update from the LineageOS Updater
   app.** Both install to the inactive slot `_b`, which has no bootloader on this unit.
 * **Never `adb reboot recovery`.** Boot TWRP with the buttons.
@@ -333,3 +495,7 @@ scripts with the session's settings.
 | `remote-build.sh advgrid-module <ver>` | build the trebuchet_advgrid Magisk module | `warhol-modules/` |
 | `flash_three.sh <dir>` | write the three partitions from TWRP, verified | **the phone** |
 | `postflash_check.sh` | 16 read-only checks on the booted phone | no |
+| `gki_update.py list` | the phone's kernel and newer builds on its release line | no |
+| `gki_update.py build <tag> [--check-only]` | download a GKI release, check it against the vendor modules, build `boot_a` and `system_dlkm_a` | `gki/` |
+| `gki_update.py write-dlkm <dir> [--rollback]` | write `system_dlkm_a` from TWRP, verified | **the phone** |
+| `cpio_drop.py` | remove modules from one list inside a vendor ramdisk | no (writes a file) |

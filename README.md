@@ -13,8 +13,8 @@ modules for optional features.
 | --- | --- |
 | `remote/` | `remote-build.sh` and friends: sync, patch, build, sign on the Linux build host (see `remote/README.md`) |
 | `docker/` | the older macOS/colima build environment |
-| `docs/` | `UPDATING.md`, the ROM update procedure |
-| `tools/` | the update tools (`update_check.sh`, `resync.sh`, `patch_report.sh`, `save_build.sh`, `policy_check.sh`), flashing (`flash_three.sh`), post-flash checks, debuggable-props patch, APEX keys, IMS extraction |
+| `docs/` | `UPDATING.md`, the ROM and kernel update procedures |
+| `tools/` | the update tools (`update_check.sh`, `resync.sh`, `patch_report.sh`, `save_build.sh`, `policy_check.sh`), GKI kernel updates (`gki_update.py`, `cpio_drop.py`), flashing (`flash_three.sh`), post-flash checks, debuggable-props patch, APEX keys, IMS extraction |
 | `patches/<area>/` | git-format patches for other LineageOS projects (FOD, face enrollment, SystemUI, Launcher3) with their `BASE_COMMIT` |
 | `patches/tree/` | the scripted fixes `remote-build.sh` applies to the source tree: eSIM (OpenEUICC/lpac, telephony), APNs, status-bar and Messaging cutout, Kyiv timezone, stats default off |
 | `magisk-modules/` | optional features as Magisk modules |
@@ -27,7 +27,9 @@ modules for optional features.
 
 [`docs/UPDATING.md`](docs/UPDATING.md) is the update procedure: check for a new security
 patch level, resync, build, verify every warhol fix applied, check the boot-time SELinux
-policy, flash, verify, and roll back if needed. Run it at least quarterly.
+policy, flash, verify, and roll back if needed. Run it at least quarterly. Its
+"Updating the kernel" section moves the phone to a newer Google GKI build of the same KMI
+generation, checked against every vendor module first.
 
 ## Modules
 
