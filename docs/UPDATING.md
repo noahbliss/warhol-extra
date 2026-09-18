@@ -8,6 +8,9 @@ A routine update takes a few minutes of hands-on time and roughly half an hour o
 time. The September 2026 resync took 2 minutes and the incremental build took 14. A
 quarter's worth of upstream changes will take longer.
 
+This phone's state, its safety rules and the reason for each are in
+[DEVICE-NOTES.md](DEVICE-NOTES.md). Wiping and reinstalling is [REINSTALL.md](REINSTALL.md).
+
 ## What an update covers, and what it does not
 
 | layer | where it comes from | level on 2026-09-18 | updated by this procedure |
@@ -440,8 +443,8 @@ start of the live image: `cmp -n $(stat -c %s check.img) check.img live.img`.
   leaves working-tree edits alone. Pre-sync local edits are in `git stash list` as
   `warhol-pre-resync-<stamp>`. `resync --snapshot` takes a snapshot without syncing, for
   example before experimenting in the tree.
-* **Across a branch bump:** expect to need a data wipe. Follow the reinstall runbook
-  instead.
+* **Across a branch bump:** expect to need a data wipe. Follow
+  [REINSTALL.md](REINSTALL.md) instead.
 * **Kernel:** see the end of step 5 in [Updating the kernel](#updating-the-kernel).
   `gki/builds/<tag>/rollback/` holds both partitions as they were before that update.
 
@@ -499,3 +502,4 @@ scripts with the session's settings.
 | `gki_update.py build <tag> [--check-only]` | download a GKI release, check it against the vendor modules, build `boot_a` and `system_dlkm_a` | `gki/` |
 | `gki_update.py write-dlkm <dir> [--rollback]` | write `system_dlkm_a` from TWRP, verified | **the phone** |
 | `cpio_drop.py` | remove modules from one list inside a vendor ramdisk | no (writes a file) |
+| `gapps-to-magisk.sh <MindTheGapps zip>` | repack GApps as a Magisk module (see [REINSTALL.md](REINSTALL.md)) | no (writes a file) |

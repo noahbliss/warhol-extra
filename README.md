@@ -13,12 +13,12 @@ modules for optional features.
 | --- | --- |
 | `remote/` | `remote-build.sh` and friends: sync, patch, build, sign on the Linux build host (see `remote/README.md`) |
 | `docker/` | the older macOS/colima build environment |
-| `docs/` | `UPDATING.md`, the ROM and kernel update procedures |
-| `tools/` | the update tools (`update_check.sh`, `resync.sh`, `patch_report.sh`, `save_build.sh`, `policy_check.sh`), GKI kernel updates (`gki_update.py`, `cpio_drop.py`), flashing (`flash_three.sh`), post-flash checks, debuggable-props patch, APEX keys, IMS extraction |
+| `docs/` | `UPDATING.md` (ROM and kernel updates), `REINSTALL.md` (wipe, reinstall, Google restore), `DEVICE-NOTES.md` (this phone's state, rules, and every hard-won finding) |
+| `tools/` | the update tools (`update_check.sh`, `resync.sh`, `patch_report.sh`, `save_build.sh`, `policy_check.sh`), GKI kernel updates (`gki_update.py`, `cpio_drop.py`), flashing (`flash_three.sh`), post-flash checks, debuggable-props patch, GApps as a Magisk module (`gapps-to-magisk.sh`), APEX keys, IMS extraction |
 | `patches/<area>/` | git-format patches for other LineageOS projects (FOD, face enrollment, SystemUI, Launcher3) with their `BASE_COMMIT` |
 | `patches/tree/` | the scripted fixes `remote-build.sh` applies to the source tree: eSIM (OpenEUICC/lpac, telephony), APNs, status-bar and Messaging cutout, Kyiv timezone, stats default off |
 | `magisk-modules/` | optional features as Magisk modules |
-| `modules-pack/` | builds one TWRP-flashable zip that installs a set of modules |
+| `modules-pack/` | a TWRP-flashable zip that stages modules before first boot; **boot-loops warhol**, see its README |
 
 `remote-build.sh` expects this repo at `$WARHOL_ROOT/warhol-extra` (override with
 `WARHOL_EXTRA`) and refuses to patch the tree without it.
@@ -30,6 +30,10 @@ patch level, resync, build, verify every warhol fix applied, check the boot-time
 policy, flash, verify, and roll back if needed. Run it at least quarterly. Its
 "Updating the kernel" section moves the phone to a newer Google GKI build of the same KMI
 generation, checked against every vendor module first.
+
+Before any work on the phone itself, read [`docs/DEVICE-NOTES.md`](docs/DEVICE-NOTES.md):
+it has been bricked twice, and the rules there are why it has not been a third time.
+[`docs/REINSTALL.md`](docs/REINSTALL.md) is the wipe-and-reinstall procedure.
 
 ## Modules
 

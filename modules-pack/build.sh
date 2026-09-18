@@ -13,7 +13,10 @@ SRC="$KIT/warhol-modules-pack-src"
 STAGE="$SRC/staging"
 OUT="$KIT/warhol-modules-pack.zip"
 
-# Standard delivery = stage all Magisk modules into /data/adb/modules before first
+# WARNING: staging modules into /data/adb before the first boot boot-loops warhol (the
+# first boot's encryption policy needs /data/adb empty). See README.md next to this
+# file; docs/REINSTALL.md installs modules after the first boot instead.
+# Original intent: stage all Magisk modules into /data/adb/modules before first
 # boot (survives a /data wipe; needs no Magisk app). Google is NEVER baked -- see
 # the module-staging / gapps-systemless notes. Trebuchet's advanced grid is an optional
 # feature that is never baked into the base ROM, so its module is staged here; rebuild

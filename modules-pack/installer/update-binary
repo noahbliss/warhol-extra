@@ -9,6 +9,10 @@
 # zygote, with no Magisk app needed.
 #
 # Flash right after formatting /data, before the first boot.
+#
+# WARNING: on warhol this boot-loops. The first boot applies the file-based
+# encryption policy to /data/adb, which must be empty, and the staged modules make
+# it non-empty. Install modules after the first boot instead (docs/REINSTALL.md).
 # Idempotent: safe to re-flash. Touches nothing outside /data/adb/modules.
 
 ZIP="$3"
