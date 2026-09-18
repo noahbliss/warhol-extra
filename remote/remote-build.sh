@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
 # =============================================================================
-# remote-build.sh — LineageOS 23.2 for warhol, on the Debian box.
+# remote-build.sh — LineageOS for warhol, on the Debian box.
 #
-#     ./remote-build.sh sync     repo init + sync   (long; run under tmux)
+#     ./remote-build.sh sync     repo init + sync of a NEW tree (long; run under tmux)
+#     ./remote-build.sh resync [--check]  bring an existing tree up to date, safely
+#     ./remote-build.sh update-check      phone vs tree vs upstream security patch level
 #     ./remote-build.sh build    lunch + mka bacon  (long; run under tmux)
+#     ./remote-build.sh save-build <name>         archive tmp/flash into builds/<name>
+#     ./remote-build.sh policy-check <build dir>  compile the boot-time SELinux policy
 #     ./remote-build.sh sepolicy  m selinux_policy only (cheap policy check)
 #     ./remote-build.sh apex-sign  re-sign with our APEX keys + build a signed OTA
 #     ./remote-build.sh shell    interactive shell in the build container
 #     ./remote-build.sh status   where things stand
+#
+# The update procedure that strings these together is warhol-extra/docs/UPDATING.md.
 #
 # EVERYTHING lives on the 4TB drive. The root filesystem has ~31 GB free, which a
 # 120 GB tree and a 60 GB out/ would obliterate, so the container store, the
@@ -39,13 +45,17 @@ P="${WARHOL_ROOT:-/run/media/local/4TB/warhol-los}"
 WX="${WARHOL_EXTRA:-$P/warhol-extra}"
 BRANCH="${WARHOL_BRANCH:-lineage-23.2}"
 
-# The three LineageOS helper repos in the local manifest below are DEAD WEIGHT in this
+# Two LineageOS helper repos in the local manifest below are DEAD WEIGHT in this
 # port: nothing in the device tree references them outside comments, and
-# module-info.json for build 9 installs ZERO modules from hardware/xiaomi,
-# hardware/mediatek or device/mediatek. On a version bump they are worse than dead --
-# soong analyzes every Android.bp in the tree, so a 23.2-era hardware/xiaomi in an
-# Android 17 tree can fail analysis for a repo we never use. hardware/xiaomi has no
-# lineage-24.0 branch at all. Set WARHOL_NO_LEGACY_DEPS=1 to omit all three.
+# module-info.json for build 9 installs ZERO modules from hardware/xiaomi or
+# hardware/mediatek. On a version bump they are worse than dead -- soong analyzes
+# every Android.bp in the tree, so a 23.2-era hardware/xiaomi in an Android 17 tree
+# can fail analysis for a repo we never use. hardware/xiaomi has no lineage-24.0
+# branch at all. Set WARHOL_NO_LEGACY_DEPS=1 to omit both.
+# device/mediatek/sepolicy_vndr used to be in the same group, but the from-source
+# vendor sepolicy behind native enforcing builds on it (it is in the device tree's
+# lineage.dependencies), so it is always in the manifest. Omitting it made `sync`
+# delete the checkout.
 NO_LEGACY_DEPS="${WARHOL_NO_LEGACY_DEPS:-}"
 
 # The release config must follow the branch, and getting it wrong does not fail the
@@ -138,8 +148,8 @@ install_keys() {
 }
 
 # The copy of this script that runs lives at $P/remote-build.sh, while the source
-# of truth is remote/remote-build.sh inside the device tree at
-# $P/device/xiaomi/warhol. They are separate files and they drift silently -- a
+# of truth is remote/remote-build.sh in warhol-extra ($WX). They are separate files
+# and they drift silently -- a
 # patch_tree fix sat in the tree for a whole build cycle while the deployed copy
 # ran the old logic, and the build failed on exactly the thing the fix addressed.
 # Warn rather than auto-copy: replacing the running script mid-run is worse.
@@ -690,20 +700,35 @@ run() {
 # Filled into the local manifest unless WARHOL_NO_LEGACY_DEPS is set. See the note
 # above NO_LEGACY_DEPS for why omitting them is the safer default on a new branch.
 if [ -n "$NO_LEGACY_DEPS" ]; then
-    LEGACY_DEPS="  <!-- hardware/mediatek, hardware/xiaomi and device/mediatek/sepolicy_vndr
-       deliberately omitted: unreferenced by this device tree and zero installed
-       modules, so on a new platform branch they are analysis risk for no gain. -->"
+    LEGACY_DEPS="  <!-- hardware/mediatek and hardware/xiaomi deliberately omitted:
+       unreferenced by this device tree and zero installed modules, so on a new
+       platform branch they are analysis risk for no gain. -->"
 else
     LEGACY_DEPS="  <project name=\"LineageOS/android_hardware_mediatek\"
            path=\"hardware/mediatek\" remote=\"github\" revision=\"$BRANCH\" />
   <project name=\"LineageOS/android_hardware_xiaomi\"
-           path=\"hardware/xiaomi\" remote=\"github\" revision=\"$BRANCH\" />
-  <project name=\"LineageOS/android_device_mediatek_sepolicy_vndr\"
-           path=\"device/mediatek/sepolicy_vndr\" remote=\"github\" revision=\"$BRANCH\" />"
+           path=\"hardware/xiaomi\" remote=\"github\" revision=\"$BRANCH\" />"
 fi
+LEGACY_DEPS="$LEGACY_DEPS
+  <!-- MTK vendor sepolicy base for the from-source vendor sepolicy (native enforcing). -->
+  <project name=\"LineageOS/android_device_mediatek_sepolicy_vndr\"
+           path=\"device/mediatek/sepolicy_vndr\" remote=\"github\" revision=\"$BRANCH\" />
+"
+
+# The tools the update procedure uses (warhol-extra/tools) take the same settings.
+export WARHOL_ROOT="$P" WARHOL_EXTRA="$WX" WARHOL_BRANCH="$BRANCH" WARHOL_RELEASE="$REL"
 
 case "${1:-status}" in
 sync)
+    # Only for a NEW tree. On an existing one this would run patch_tree first (so
+    # repo refuses the now-dirty projects), float OpenEUICC off the revision the
+    # eSIM patches were validated on, and discard the stashes nobody made. `resync`
+    # does it properly.
+    if [ -d "$P/src/.repo" ] && [ -z "${WARHOL_FORCE_SYNC:-}" ]; then
+        echo "ERROR: $P/src is an existing tree; use \`$0 resync\` (see docs/UPDATING.md)." >&2
+        echo "       (WARHOL_FORCE_SYNC=1 overrides; it regenerates the local manifest.)" >&2
+        exit 1
+    fi
     mkdir -p "$P/src"
     CMD='
 set -e
@@ -938,5 +963,15 @@ status)
     echo "=== tmux ==="
     tmux ls 2>/dev/null || echo "  (no sessions)"
     ;;
-*) echo "usage: $0 [sync|config|sepolicy|module <name>|advgrid-module <ver>|build|shell|status]" >&2; exit 1 ;;
+update-check)
+    check_deployed
+    exec bash "$WX/tools/update_check.sh" ;;
+resync)
+    check_deployed
+    shift; exec bash "$WX/tools/resync.sh" "$@" ;;
+save-build)
+    shift; exec bash "$WX/tools/save_build.sh" "$@" ;;
+policy-check)
+    shift; exec bash "$WX/tools/policy_check.sh" "$@" ;;
+*) echo "usage: $0 [sync|resync [--check]|update-check|config|sepolicy|module <name>|advgrid-module <ver>|build|save-build <name>|policy-check <dir>|shell|status]" >&2; exit 1 ;;
 esac

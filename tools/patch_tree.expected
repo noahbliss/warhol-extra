@@ -1,0 +1,22 @@
+# Every "patched: ..." line patch_tree prints on a FRESHLY SYNCED tree (the first build
+# after a resync). On a rebuild most steps say "already patched" instead, so compare only
+# then. patch_report.sh checks a build log against this list. When a patch is retired or
+# upstream merges it, delete its line here in the same commit.
+UiccPort isEs10Command derived from channel AID
+OpenEUICC connectSEService deadlock
+lpac ES10c targetPortIndex (MEP-A1)
+OpenEUICC ES10x MSS default 63 -> 255
+OpenEUICC/lpac eSIM-enable use-after-free
+warhol_sepolicy.cil regenerated
+US Mobile 310240 APNs
+Messaging windowLayoutInDisplayCutoutMode=shortEdges
+SystemUI status bar cutout insets
+boot image --no-abort-on-hard-verifier-error (A17 MTK prebuilt jars)
+openeuicc-deps sdk_version 37 -> 36
+added carrier_config_mccmnc_25503.xml (Kyivstar VoLTE/VoWiFi)
+com.xiaomi added to the boot jar package allow list
+Europe/Kyiv timezone
+stats collection default off
+Settings face HAL draws enrollment preview
+FOD 0001-ueventd-import-system_ext-rules.patch
+FOD 0002-SystemUI-Xiaomi-FOD-condition-updates.patch

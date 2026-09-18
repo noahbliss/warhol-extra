@@ -33,7 +33,7 @@ Two things to know about that drive:
 
 | script | what it does |
 | --- | --- |
-| `remote-build.sh` | one stage: `sync`, `config`, `build`, `apex-sign`, `shell`, `status` |
+| `remote-build.sh` | one stage: `sync` (new tree only), `resync`, `update-check`, `config`, `build`, `save-build`, `policy-check`, `advgrid-module`, `apex-sign`, `shell`, `status` |
 | `pipeline.sh` | runs sync → config → build unattended, with retries |
 | `probe.sh` | prints one compact line describing the whole pipeline |
 | `watch-pipeline.sh` | polls `probe.sh` and emits a line per meaningful change |
@@ -60,6 +60,10 @@ Two more live in `$P/bin` on the host, deployed from `../tools/`:
 | `build-super.sh` | assemble a flashable `super.img` from built + stock partitions |
 
 ### The release sequence
+
+For the current 24.0 tree, the build-to-phone procedure is
+[`../docs/UPDATING.md`](../docs/UPDATING.md): `build`, then `save-build`, `policy-check`
+and `tools/flash_three.sh`. The sequence below is the older full-image path from 23.2.
 
 ```bash
 ./remote-build.sh build                                     # mka bacon
